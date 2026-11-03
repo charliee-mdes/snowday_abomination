@@ -1,0 +1,6 @@
+{
+  "name": "Frostbite Outpost: 360 Snowball FPS",
+  "description": "First-person snowball shooter defending against 360-degree snow monster hordes with a central directional threat interface.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
