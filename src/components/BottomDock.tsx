@@ -11,7 +11,8 @@ import {
   Snowflake, 
   ShieldAlert, 
   RotateCcw,
-  Sparkles
+  Sparkles,
+  Home
 } from 'lucide-react';
 
 interface BottomDockProps {
@@ -23,6 +24,8 @@ interface BottomDockProps {
   onSnapTurn: () => void;
   onOpenHelp: () => void;
   onRestart: () => void;
+  onOpenEnemyOverview?: () => void;
+  onReturnToHome?: () => void;
 }
 
 export const BottomDock: React.FC<BottomDockProps> = ({
@@ -34,6 +37,8 @@ export const BottomDock: React.FC<BottomDockProps> = ({
   onSnapTurn,
   onOpenHelp,
   onRestart,
+  onOpenEnemyOverview,
+  onReturnToHome,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState<'snowballs' | 'settings'>('snowballs');
@@ -150,6 +155,17 @@ export const BottomDock: React.FC<BottomDockProps> = ({
                 <span className="hidden sm:inline">FACE THREAT [F]</span>
               </button>
 
+              {/* Enemy Intel button */}
+              {onOpenEnemyOverview && (
+                <button
+                  onClick={onOpenEnemyOverview}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-cyan-200 border border-cyan-500/30 transition-colors cursor-pointer"
+                  title="Enemy Dossier & 3D Models"
+                >
+                  <ShieldAlert className="w-4 h-4" />
+                </button>
+              )}
+
               {/* How to Play button */}
               <button
                 onClick={onOpenHelp}
@@ -250,14 +266,28 @@ export const BottomDock: React.FC<BottomDockProps> = ({
                 />
               </div>
 
-              {/* Restart Game button */}
-              <button
-                onClick={onRestart}
-                className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-rose-950/60 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 text-slate-300 transition-colors cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Restart</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                {/* Main Menu button */}
+                {onReturnToHome && (
+                  <button
+                    onClick={onReturnToHome}
+                    className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
+                    title="Return to Home Screen"
+                  >
+                    <Home className="w-3.5 h-3.5" />
+                    <span>Home</span>
+                  </button>
+                )}
+
+                {/* Restart Game button */}
+                <button
+                  onClick={onRestart}
+                  className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-rose-950/60 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 text-slate-300 transition-colors cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Restart</span>
+                </button>
+              </div>
             </div>
           )}
         </div>

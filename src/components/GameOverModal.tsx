@@ -1,17 +1,21 @@
 import React from 'react';
 import { GameStats } from '../game/types';
-import { RotateCcw, Trophy, Target, Zap, Snowflake } from 'lucide-react';
+import { RotateCcw, Trophy, Target, Zap, Snowflake, ShieldAlert, Home } from 'lucide-react';
 
 interface GameOverModalProps {
   stats: GameStats;
   won: boolean;
   onRestart: () => void;
+  onOpenEnemyOverview?: () => void;
+  onReturnToHome?: () => void;
 }
 
 export const GameOverModal: React.FC<GameOverModalProps> = ({
   stats,
   won,
   onRestart,
+  onOpenEnemyOverview,
+  onReturnToHome,
 }) => {
   const isNewHighScore = stats.score >= stats.highScore && stats.score > 0;
 
@@ -68,14 +72,38 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           </div>
         </div>
 
-        {/* Restart Button */}
-        <button
-          onClick={onRestart}
-          className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-slate-950 font-mono font-black text-sm tracking-wider shadow-lg shadow-cyan-500/25 transition-all cursor-pointer"
-        >
-          <RotateCcw className="w-4 h-4" />
-          <span>DEFEND AGAIN</span>
-        </button>
+        {/* Action Buttons */}
+        <div className="flex flex-col gap-2.5 w-full">
+          <button
+            onClick={onRestart}
+            className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-slate-950 font-mono font-black text-sm tracking-wider shadow-lg shadow-cyan-500/25 transition-all cursor-pointer"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span>DEFEND AGAIN</span>
+          </button>
+
+          <div className="flex items-center gap-2 w-full">
+            {onOpenEnemyOverview && (
+              <button
+                onClick={onOpenEnemyOverview}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 font-mono font-bold text-xs border border-slate-700 transition-colors cursor-pointer"
+              >
+                <ShieldAlert className="w-3.5 h-3.5" />
+                <span>Enemy Dossier</span>
+              </button>
+            )}
+
+            {onReturnToHome && (
+              <button
+                onClick={onReturnToHome}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono font-bold text-xs border border-slate-700 transition-colors cursor-pointer"
+              >
+                <Home className="w-3.5 h-3.5" />
+                <span>Main Menu</span>
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -81,7 +81,7 @@ export class GameEngine {
   private waveEnemiesTotal: number = 0;
   private waveEnemiesSpawned: number = 0;
   private waveSpawnTimer: number = 0;
-  private waveState: 'active' | 'spawning' | 'intermission' = 'intermission';
+  private waveState: 'home' | 'active' | 'spawning' | 'intermission' = 'home';
   private intermissionTimer: number = 2.0;
 
   // Stats & State
@@ -169,7 +169,7 @@ export class GameEngine {
 
     this.initThree();
     this.initControls();
-    this.startWave(1);
+    this.waveState = 'home';
     this.startLoop();
   }
 
@@ -241,7 +241,7 @@ export class GameEngine {
 
     // Pointer Lock on click
     canvas.addEventListener('click', () => {
-      if (!this.isPointerLocked && !this.isPaused) {
+      if (!this.isPointerLocked && !this.isPaused && this.waveState !== 'home') {
         canvas.requestPointerLock?.();
       }
     });
@@ -385,7 +385,7 @@ export class GameEngine {
   }
 
   public throwSnowball() {
-    if (this.isPaused || this.player.warmth <= 0) return;
+    if (this.isPaused || this.player.warmth <= 0 || this.waveState === 'home') return;
 
     const now = performance.now() / 1000;
     if (now - this.lastShootTime < this.shootCooldown) return;
@@ -952,7 +952,15 @@ export class GameEngine {
       const delta = Math.min(0.1, this.clock.getDelta());
       const time = this.clock.getElapsedTime();
 
-      if (!this.isPaused) {
+      if (this.waveState === 'home') {
+        // Slow ambient pan in background of home screen
+        this.yaw += 0.05 * delta;
+        this.pitch = THREE.MathUtils.damp(this.pitch, 0.02, 3, delta);
+        this.updateCameraRotation();
+        this.env.updateParticles(delta);
+        this.env.updateBrazier(time);
+        this.viewModel.update(delta, false);
+      } else if (!this.isPaused) {
         // Combo timer countdown
         if (this.stats.comboTimer > 0) {
           this.stats.comboTimer -= delta;
@@ -1056,6 +1064,46 @@ export class GameEngine {
     this.isPaused = false;
     this.startWave(1);
     this.callbacks.onStatsUpdate({ ...this.stats });
+    this.callbacks.onPlayerUpdate({ ...this.player });
+  }
+
+  public startLevel() {
+    this.restartGame();
+    this.waveState = 'spawning';
+    this.renderer.domElement.requestPointerLock?.();
+  }
+
+  public returnToHome() {
+    // Clear entities
+    for (const m of this.monsters) {
+      this.scene.remove(m.group);
+    }
+    this.monsters = [];
+
+    for (const s of this.snowballs) {
+      this.scene.remove(s.mesh);
+    }
+    this.snowballs = [];
+
+    for (const p of this.impactParticles) {
+      this.scene.remove(p.mesh);
+    }
+    this.impactParticles = [];
+
+    this.player.warmth = 100;
+    this.waveState = 'home';
+    this.isPaused = false;
+    this.yaw = 0;
+    this.pitch = 0;
+    this.updateCameraRotation();
+    if (document.pointerLockElement) {
+      document.exitPointerLock?.();
+    }
+    this.callbacks.onThreatUpdate({
+      nearestMonster: null,
+      allThreats: [],
+      totalEnemies: 0,
+    });
     this.callbacks.onPlayerUpdate({ ...this.player });
   }
 
