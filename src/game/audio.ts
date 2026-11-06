@@ -202,6 +202,30 @@ class SoundEngine {
     });
   }
 
+  /** Elf sidekick sleigh-bell jingle (quick high double-ding) */
+  public playElfJingle(happy: boolean = false) {
+    this.initContext();
+    if (!this.ctx || !this.sfxGain || this.isMuted) return;
+
+    const t = this.ctx.currentTime;
+    const freqs = happy ? [1318.5, 1568, 2093] : [1760, 1568];
+    freqs.forEach((freq, idx) => {
+      if (!this.ctx || !this.sfxGain) return;
+      const start = t + idx * 0.07;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.09, start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.18);
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.start(start);
+      osc.stop(start + 0.2);
+    });
+  }
+
   /** Player hurt freeze damage crackle */
   public playPlayerDamage() {
     this.initContext();

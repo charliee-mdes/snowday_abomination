@@ -9,6 +9,7 @@ import { GameOverModal } from './components/GameOverModal';
 import { InstructionsModal } from './components/InstructionsModal';
 import { HomeScreen } from './components/HomeScreen';
 import { EnemyOverviewScreen } from './components/EnemyOverviewScreen';
+import { ElfSidekick } from './components/ElfSidekick';
 import { MousePointer, Crosshair, Sparkles } from 'lucide-react';
 
 export default function App() {
@@ -187,6 +188,12 @@ export default function App() {
             threatInfo={threatInfo}
             onSnapTurn={handleSnapTurn}
             styleMode={settings.reticleStyle}
+          />
+
+          {/* Jingles the Elf — peripheral sidekick nagging you to face the nearest monster */}
+          <ElfSidekick
+            threatInfo={threatInfo}
+            active={!gameOver.open && !showHelp && !showEnemyOverview}
           />
 
           {/* Wave Victory Fanfare Banner */}
