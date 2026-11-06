@@ -49,6 +49,27 @@ if (sawWarning) {
   await page.waitForTimeout(1800);
   console.log('bubble after happy period:', await bubble.count());
   await page.screenshot({ path: OUT + '5-elf-gone.png' });
+
+  // The elf asks Gemini for fresh lines in the background. Wait for them, then catch him using one.
+  const elf = page.locator('[data-elf-source]');
+  try {
+    await page.waitForSelector('[data-elf-source="gemini"]', { timeout: 45000 });
+    console.log('gemini lines: received');
+    const t1 = Date.now();
+    while (!(await bubble.count()) && Date.now() - t1 < 30000) {
+      await page.keyboard.down('ArrowLeft');
+      await page.waitForTimeout(250);
+      await page.keyboard.up('ArrowLeft');
+      await page.waitForTimeout(250);
+    }
+    if (await bubble.count()) {
+      await page.waitForTimeout(400);
+      console.log('gemini-written warning:', (await bubble.innerText()).replace(/\n/g, ' / '));
+      await page.screenshot({ path: OUT + '6-elf-gemini.png' });
+    }
+  } catch {
+    console.log('gemini lines: not received (source =', await elf.getAttribute('data-elf-source'), ') - elf is using built-in lines');
+  }
 }
 console.log('errors:', errors.length ? errors : 'none');
 await browser.close();

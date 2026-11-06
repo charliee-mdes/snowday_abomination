@@ -1,16 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ThreatInfo, MonsterType } from '../game/types';
+import { ThreatInfo, MonsterType, GameStats } from '../game/types';
 import { ENEMY_INTEL_LIST } from '../game/monsterIntel';
 import { sound } from '../game/audio';
+import { ElfBrain, LineSource } from '../game/elfBrain';
 
 /**
  * Jingles the Elf — a peripheral sidekick who pops in from the screen edge
  * when you've been ignoring the nearest monster for too long, and cheers
- * when you finally turn to face it.
+ * when you finally turn to face it. What he says is written on the fly by
+ * Gemini based on how you're playing (see game/elfBrain.ts); the direction
+ * hints are always computed by the game so they stay accurate.
  */
 
 interface ElfSidekickProps {
   threatInfo: ThreatInfo | null;
+  stats: GameStats;
+  warmth: number;
   active: boolean;
 }
 
@@ -32,44 +37,6 @@ const HAPPY_MS = 1400;           // how long the "yay you did it" moment lasts
 const COOLDOWN_MS = 2500;        // breather after cheering before warning again
 const BEHIND_DEG = 140;
 
-// --- Silly phrases --------------------------------------------------------
-const EXCLAIMS = [
-  'Gee willikers!',
-  'Jiminy Christmas!',
-  'Holy candy canes!',
-  "Jumpin' jingle bells!",
-  'Oh, fiddlesticks!',
-  'Sweet sugarplums!',
-  'Great googly mistletoe!',
-  'Golly gumdrops!',
-  'Yikes-a-roo!',
-  'Leapin’ licorice!',
-  'Son of a nutcracker!',
-  'Hoo boy, hoo boy!',
-];
-
-const CRITICAL_EXCLAIMS = [
-  'JINGLE BELLS, IT’S CLOSE!',
-  'GEE WILLIKERS, LOOK OUT!',
-  'HOLY FRUITCAKE, MOVE IT!',
-  'OH NO NO NO NO!',
-  'SANTA’S SUSPENDERS, TURN!',
-];
-
-const HAPPY_EXCLAIMS = [
-  'Atta snowball-slinger!',
-  'Yippee! Ya see ’em!',
-  'Hot cocoa, that’s it!',
-  'Ho ho hooray!',
-  'Now we’re sleddin’!',
-  'Wowee! Let ’em have it!',
-];
-
-const pick = (list: string[], avoid?: string) => {
-  const pool = list.length > 1 && avoid ? list.filter((p) => p !== avoid) : list;
-  return pool[Math.floor(Math.random() * pool.length)];
-};
-
 const monsterName = (type: MonsterType) =>
   ENEMY_INTEL_LIST.find((i) => i.type === type)?.name ?? 'Snow beastie';
 
@@ -82,8 +49,36 @@ const buildHint = (type: MonsterType, angle: number, critical: boolean) => {
   return critical ? `${name} on your ${dir}, turn turn TURN!` : `${name} over to your ${dir}!`;
 };
 
-export const ElfSidekick: React.FC<ElfSidekickProps> = ({ threatInfo, active }) => {
+export const ElfSidekick: React.FC<ElfSidekickProps> = ({ threatInfo, stats, warmth, active }) => {
   const [elf, setElf] = useState<ElfState>({ mood: 'hidden', side: 'right', exclaim: '', hint: '' });
+  const [lineSource, setLineSource] = useState<LineSource>('builtin');
+
+  const brainRef = useRef<ElfBrain | null>(null);
+  if (!brainRef.current) {
+    brainRef.current = new ElfBrain();
+    brainRef.current.onSourceChange = setLineSource;
+  }
+  const brain = brainRef.current;
+
+  // Keep the brain's picture of the game current (a new wave triggers fresh lines)
+  const monstersKey = [...new Set((threatInfo?.allThreats ?? []).map((t) => t.type))].sort().join(',');
+  useEffect(() => {
+    if (!active) return;
+    brain.update({
+      wave: stats.wave,
+      warmth,
+      score: stats.score,
+      accuracy: stats.accuracy,
+      monstersPresent: monstersKey ? (monstersKey.split(',') as MonsterType[]) : [],
+    });
+  }, [active, stats.wave, stats.score, stats.accuracy, warmth, monstersKey, brain]);
+
+  // Getting hit while the elf is yelling is something he'll remember
+  const prevWarmth = useRef(warmth);
+  useEffect(() => {
+    if (warmth < prevWarmth.current && rt.current.mood === 'warning') brain.recordHitWhileWarned();
+    prevWarmth.current = warmth;
+  }, [warmth, brain]);
 
   // Mutable timing state that shouldn't trigger re-renders on every frame
   const rt = useRef({
@@ -97,6 +92,7 @@ export const ElfSidekick: React.FC<ElfSidekickProps> = ({ threatInfo, active }) 
     critical: false,
     exclaim: '',
     hideTimer: 0 as ReturnType<typeof setTimeout> | 0,
+    warnedAt: 0,
   });
 
   const commit = (next: ElfState) => {
@@ -145,7 +141,7 @@ export const ElfSidekick: React.FC<ElfSidekickProps> = ({ threatInfo, active }) 
           commit({
             mood: 'warning',
             side,
-            exclaim: rotate ? pick(critical ? CRITICAL_EXCLAIMS : EXCLAIMS, r.exclaim) : r.exclaim,
+            exclaim: rotate ? brain.pick(critical ? 'critical' : 'warn') : r.exclaim,
             hint: buildHint(nearest.type, angle, critical),
           });
         }
@@ -160,11 +156,13 @@ export const ElfSidekick: React.FC<ElfSidekickProps> = ({ threatInfo, active }) 
         r.behind = behind;
         r.critical = critical;
         r.lastPhraseAt = now;
+        r.warnedAt = now;
         sound.playElfJingle(false);
+        brain.recordWarning();
         commit({
           mood: 'warning',
           side,
-          exclaim: pick(critical ? CRITICAL_EXCLAIMS : EXCLAIMS, r.exclaim),
+          exclaim: brain.pick(critical ? 'critical' : 'warn'),
           hint: buildHint(nearest.type, angle, critical),
         });
       }
@@ -176,7 +174,8 @@ export const ElfSidekick: React.FC<ElfSidekickProps> = ({ threatInfo, active }) 
     if (r.mood === 'warning') {
       sound.playElfJingle(true);
       r.cooldownUntil = now + HAPPY_MS + COOLDOWN_MS;
-      commit({ mood: 'happy', side: r.side, exclaim: pick(HAPPY_EXCLAIMS), hint: 'Let ’em have it!' });
+      brain.recordReaction(now - r.warnedAt);
+      commit({ mood: 'happy', side: r.side, exclaim: brain.pick('happy'), hint: brain.pick('cheer') });
       if (r.hideTimer) clearTimeout(r.hideTimer);
       r.hideTimer = setTimeout(() => {
         if (rt.current.mood === 'happy') {
@@ -202,6 +201,7 @@ export const ElfSidekick: React.FC<ElfSidekickProps> = ({ threatInfo, active }) 
         opacity: visible ? 1 : 0,
       }}
       aria-live="polite"
+      data-elf-source={lineSource}
     >
       {/* The elf himself — mirrored on the right so his pointing arm always aims off-screen */}
       <div className={isCriticalLook ? 'elf-shake' : 'elf-bob'}>

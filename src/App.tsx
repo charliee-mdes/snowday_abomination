@@ -193,6 +193,8 @@ export default function App() {
           {/* Jingles the Elf — peripheral sidekick nagging you to face the nearest monster */}
           <ElfSidekick
             threatInfo={threatInfo}
+            stats={stats}
+            warmth={player.warmth}
             active={!gameOver.open && !showHelp && !showEnemyOverview}
           />
 
