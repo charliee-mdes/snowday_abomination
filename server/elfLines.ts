@@ -175,15 +175,22 @@ export async function generateElfLines(ctx: ElfContext, apiKey: string, model = 
 }
 
 /** Shared request handler (Web Request/Response) for both Vercel and the Vite dev server. */
-export async function handleElfLinesRequest(request: Request, apiKey: string | undefined, model?: string): Promise<Response> {
+export async function handleElfLinesRequest(request: Request, rawApiKey: string | undefined, rawModel?: string): Promise<Response> {
   if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+  // Hosting dashboards (e.g. Vercel) keep values verbatim, so a key pasted as "abc..." from a .env file
+  // would include the quotes and Gemini would reject it with a 400. Strip quotes/whitespace defensively.
+  const clean = (v?: string) => v?.trim().replace(/^(['"])(.*)\1$/, '$2').trim() || undefined;
+  const apiKey = clean(rawApiKey);
+  const model = clean(rawModel);
   if (!apiKey) return Response.json({ error: 'GEMINI_API_KEY is not configured' }, { status: 503 });
   try {
     const ctx = parseElfContext(await request.json().catch(() => ({})));
-    const lines = await generateElfLines(ctx, apiKey, model || undefined);
+    const lines = await generateElfLines(ctx, apiKey, model);
     return Response.json(lines, { headers: { 'Cache-Control': 'no-store' } });
   } catch (err) {
-    console.error('[elf-lines]', err);
+    // Log as a plain string: hosted log viewers (e.g. Vercel) collapse nested error objects to "{…}"
+    const e = err as { status?: number; message?: string };
+    console.error(`[elf-lines] status=${e.status ?? 'n/a'} model=${model || 'default'} ${e.message ?? String(err)}`);
     return Response.json({ error: 'Failed to generate lines' }, { status: 502 });
   }
 }
