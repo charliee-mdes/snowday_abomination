@@ -41,8 +41,6 @@ export default function App() {
   const [player, setPlayer] = useState<PlayerState>({
     warmth: 100,
     maxWarmth: 100,
-    isReloading: false,
-    reloadProgress: 1,
     selectedSnowball: 'standard',
     unlockedSnowballs: {
       standard: true,
@@ -62,8 +60,6 @@ export default function App() {
     invertY: false,
     soundVolume: 0.7,
     soundMuted: false,
-    autoSnapAssist: false,
-    reticleStyle: 'tactical',
   });
 
   // Initialize Game Engine once on mount
@@ -102,6 +98,12 @@ export default function App() {
       engineRef.current = null;
     };
   }, []);
+
+  // Freeze the game while a menu covers it (game over pauses itself inside the engine)
+  const menuOpen = isGameStarted && (showHelp || showEnemyOverview);
+  useEffect(() => {
+    engineRef.current?.setPaused(menuOpen || gameOver.open);
+  }, [menuOpen, gameOver.open]);
 
   // Update sound settings when settings change
   const handleUpdateSettings = useCallback((newSettings: Partial<GameSettings>) => {
@@ -180,14 +182,12 @@ export default function App() {
             stats={stats}
             player={player}
             enemiesRemaining={threatInfo?.totalEnemies || 0}
-            totalWaveEnemies={stats.wave * 4}
           />
 
           {/* CENTRAL DIRECTIONAL RETICLE (The Core Feature) */}
           <CentralReticle
             threatInfo={threatInfo}
             onSnapTurn={handleSnapTurn}
-            styleMode={settings.reticleStyle}
           />
 
           {/* Jingles the Elf — peripheral sidekick nagging you to face the nearest monster */}

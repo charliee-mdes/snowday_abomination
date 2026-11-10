@@ -6,14 +6,12 @@ interface TopHUDProps {
   stats: GameStats;
   player: PlayerState;
   enemiesRemaining: number;
-  totalWaveEnemies: number;
 }
 
 export const TopHUD: React.FC<TopHUDProps> = ({
   stats,
   player,
   enemiesRemaining,
-  totalWaveEnemies,
 }) => {
   // Warmth percentage
   const warmthPct = Math.max(0, Math.min(100, (player.warmth / player.maxWarmth) * 100));

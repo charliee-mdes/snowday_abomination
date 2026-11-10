@@ -89,7 +89,7 @@ export const ENEMY_INTEL_LIST: EnemyIntel[] = [
     health: 360,
     speedRating: 'Slow',
     firstWave: 5,
-    scoreValue: 1500,
+    scoreValue: 1200,
     weakness: 'Blizzard Novas & Heavy Arcs',
     recommendedAmmo: 'Blizzard Nova [4] + Snow Boulder [3]',
     description: 'The ancient titan ruling the frozen mountain tundra. Standing over 4 meters tall with a 5-spire glacial crown, massive granite-density snow limbs, and apocalyptic health.',

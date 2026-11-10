@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { MonsterType, Monster } from '../game/types';
-import { createMonster, updateMonsterAnimation, flashMonsterHit } from '../game/monsters';
+import { createMonster, updateMonsterAnimation, flashMonsterHit, disposeMonster } from '../game/monsters';
 import { RotateCw, Sparkles, Eye, ShieldAlert } from 'lucide-react';
 
 interface Enemy3DViewerProps {
@@ -19,6 +19,11 @@ export const Enemy3DViewer: React.FC<Enemy3DViewerProps> = ({ monsterType, class
   const previousPointer = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const modelYaw = useRef<number>(0);
   const modelPitch = useRef<number>(0);
+  // Mirrors of the UI state, read by the render loop so toggling them doesn't rebuild the WebGL scene
+  const autoRotateRef = useRef(autoRotate);
+  const isDraggingRef = useRef(isDragging);
+  autoRotateRef.current = autoRotate;
+  isDraggingRef.current = isDragging;
 
   // Trigger hit reaction
   const handleTriggerHit = useCallback(() => {
@@ -140,7 +145,7 @@ export const Enemy3DViewer: React.FC<Enemy3DViewerProps> = ({ monsterType, class
       updateMonsterAnimation(monster, delta);
 
       // Handle auto-rotation
-      if (autoRotate && !isDragging) {
+      if (autoRotateRef.current && !isDraggingRef.current) {
         modelYaw.current += delta * 0.7;
       }
 
@@ -168,14 +173,15 @@ export const Enemy3DViewer: React.FC<Enemy3DViewerProps> = ({ monsterType, class
     return () => {
       cancelAnimationFrame(frameId);
       window.removeEventListener('resize', handleResize);
-      scene.remove(monster.group);
+      disposeMonster(monster);
+      monsterRef.current = null;
       shadowGeo.dispose();
       shadowMat.dispose();
       ringGeo.dispose();
       ringMat.dispose();
       renderer.dispose();
     };
-  }, [monsterType, autoRotate, isDragging]);
+  }, [monsterType]);
 
   // Pointer drag to spin 360°
   const handlePointerDown = (e: React.PointerEvent) => {

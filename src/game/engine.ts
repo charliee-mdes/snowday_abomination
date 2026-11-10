@@ -11,7 +11,7 @@ import {
   PlayerState, 
   GameSettings 
 } from './types';
-import { createMonster, updateMonsterAnimation, flashMonsterHit } from './monsters';
+import { createMonster, updateMonsterAnimation, flashMonsterHit, disposeMonster } from './monsters';
 import { setupEnvironment, EnvironmentObjects } from './environment';
 import { PlayerViewModel } from './viewmodel';
 import { sound } from './audio';
@@ -55,7 +55,9 @@ export class GameEngine {
   private heavyBoulderGeo: THREE.DodecahedronGeometry;
   private heavyBoulderMat: THREE.MeshStandardMaterial;
   private particleGeo: THREE.BoxGeometry;
-  private particleMat: THREE.MeshBasicMaterial;
+  // Particle materials are shared (one per color) so short-lived particles don't allocate GPU resources
+  private splatMats = new Map<number, THREE.MeshBasicMaterial>();
+  private shatterMats: THREE.MeshStandardMaterial[];
 
   // Camera & Player Controls
   private yaw: number = 0;
@@ -101,8 +103,6 @@ export class GameEngine {
   public player: PlayerState = {
     warmth: 100,
     maxWarmth: 100,
-    isReloading: false,
-    reloadProgress: 1,
     selectedSnowball: 'standard',
     unlockedSnowballs: {
       standard: true,
@@ -123,8 +123,6 @@ export class GameEngine {
     invertY: false,
     soundVolume: 0.7,
     soundMuted: false,
-    autoSnapAssist: false,
-    reticleStyle: 'tactical',
   };
 
   public get domElement(): HTMLCanvasElement {
@@ -165,7 +163,9 @@ export class GameEngine {
     });
 
     this.particleGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
-    this.particleMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    this.shatterMats = [0x7dd3fc, 0xffffff].map(
+      (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.3, metalness: 0.4 })
+    );
 
     this.initThree();
     this.initControls();
@@ -696,8 +696,8 @@ export class GameEngine {
               sound.playCombo(this.stats.combo);
             }
 
-            // Remove monster from scene
-            this.scene.remove(monster.group);
+            // Remove monster from scene and free its geometry
+            disposeMonster(monster);
             this.monsters.splice(mIdx, 1);
           }
 
@@ -711,17 +711,14 @@ export class GameEngine {
 
   private removeSnowball(index: number) {
     const sb = this.snowballs[index];
+    // Geometry and material are shared across all snowballs, so only remove the mesh
     this.scene.remove(sb.mesh);
-    sb.mesh.geometry.dispose();
     this.snowballs.splice(index, 1);
   }
 
   private createSnowSplat(position: THREE.Vector3, count: number, colorHex: number) {
     for (let i = 0; i < count; i++) {
-      const mesh = new THREE.Mesh(
-        this.particleGeo,
-        new THREE.MeshBasicMaterial({ color: colorHex })
-      );
+      const mesh = new THREE.Mesh(this.particleGeo, this.getSplatMat(colorHex));
       mesh.position.copy(position);
       mesh.scale.setScalar(0.4 + Math.random() * 0.8);
       this.scene.add(mesh);
@@ -743,17 +740,19 @@ export class GameEngine {
     }
   }
 
+  private getSplatMat(colorHex: number): THREE.MeshBasicMaterial {
+    let mat = this.splatMats.get(colorHex);
+    if (!mat) {
+      mat = new THREE.MeshBasicMaterial({ color: colorHex });
+      this.splatMats.set(colorHex, mat);
+    }
+    return mat;
+  }
+
   private createMonsterShatter(monster: Monster) {
     const count = monster.type === 'boss' ? 36 : 18;
     for (let i = 0; i < count; i++) {
-      const mesh = new THREE.Mesh(
-        this.particleGeo,
-        new THREE.MeshStandardMaterial({
-          color: Math.random() > 0.4 ? 0x7dd3fc : 0xffffff,
-          roughness: 0.3,
-          metalness: 0.4,
-        })
-      );
+      const mesh = new THREE.Mesh(this.particleGeo, this.shatterMats[Math.random() > 0.4 ? 0 : 1]);
       mesh.position.copy(monster.position);
       mesh.position.y += Math.random() * monster.height;
       mesh.scale.setScalar(0.8 + Math.random() * 1.2);
@@ -784,8 +783,7 @@ export class GameEngine {
       p.life += delta;
 
       if (p.life >= p.maxLife) {
-        this.scene.remove(p.mesh);
-        p.mesh.geometry.dispose();
+        this.scene.remove(p.mesh); // geometry and material are shared
         this.impactParticles.splice(i, 1);
         continue;
       }
@@ -1010,22 +1008,18 @@ export class GameEngine {
     this.callbacks.onGameOver(won);
   }
 
-  public restartGame() {
-    // Clear entities
-    for (const m of this.monsters) {
-      this.scene.remove(m.group);
-    }
+  /** Removes all monsters, snowballs and particles from the scene. */
+  private clearEntities() {
+    for (const m of this.monsters) disposeMonster(m);
     this.monsters = [];
-
-    for (const s of this.snowballs) {
-      this.scene.remove(s.mesh);
-    }
+    for (const s of this.snowballs) this.scene.remove(s.mesh);
     this.snowballs = [];
-
-    for (const p of this.impactParticles) {
-      this.scene.remove(p.mesh);
-    }
+    for (const p of this.impactParticles) this.scene.remove(p.mesh);
     this.impactParticles = [];
+  }
+
+  public restartGame() {
+    this.clearEntities();
 
     // Reset stats
     this.stats = {
@@ -1045,8 +1039,6 @@ export class GameEngine {
     this.player = {
       warmth: 100,
       maxWarmth: 100,
-      isReloading: false,
-      reloadProgress: 1,
       selectedSnowball: 'standard',
       unlockedSnowballs: {
         standard: true,
@@ -1079,21 +1071,7 @@ export class GameEngine {
   }
 
   public returnToHome() {
-    // Clear entities
-    for (const m of this.monsters) {
-      this.scene.remove(m.group);
-    }
-    this.monsters = [];
-
-    for (const s of this.snowballs) {
-      this.scene.remove(s.mesh);
-    }
-    this.snowballs = [];
-
-    for (const p of this.impactParticles) {
-      this.scene.remove(p.mesh);
-    }
-    this.impactParticles = [];
+    this.clearEntities();
 
     this.player.warmth = 100;
     this.waveState = 'home';
@@ -1118,6 +1096,7 @@ export class GameEngine {
     clearTimeout(this.frameId);
     window.removeEventListener('resize', this.onWindowResize);
 
+    this.clearEntities();
     this.env.dispose();
     this.viewModel.dispose();
     this.snowballGeo.dispose();
@@ -1127,7 +1106,8 @@ export class GameEngine {
     this.heavyBoulderGeo.dispose();
     this.heavyBoulderMat.dispose();
     this.particleGeo.dispose();
-    this.particleMat.dispose();
+    this.splatMats.forEach((m) => m.dispose());
+    this.shatterMats.forEach((m) => m.dispose());
     this.renderer.dispose();
   }
 }

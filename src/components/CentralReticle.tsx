@@ -5,13 +5,11 @@ import { Crosshair, Compass, AlertTriangle, ShieldAlert, Sparkles, Navigation } 
 interface CentralReticleProps {
   threatInfo: ThreatInfo | null;
   onSnapTurn: () => void;
-  styleMode?: 'tactical' | 'minimal' | 'radar';
 }
 
 export const CentralReticle: React.FC<CentralReticleProps> = ({
   threatInfo,
   onSnapTurn,
-  styleMode = 'tactical',
 }) => {
   const nearest = threatInfo?.nearestMonster;
   const allThreats = threatInfo?.allThreats || [];

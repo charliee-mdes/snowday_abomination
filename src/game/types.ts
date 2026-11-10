@@ -99,8 +99,6 @@ export interface GameStats {
 export interface PlayerState {
   warmth: number; // 0 to 100% health
   maxWarmth: number;
-  isReloading: boolean;
-  reloadProgress: number; // 0 to 1
   selectedSnowball: SnowballType;
   unlockedSnowballs: Record<SnowballType, boolean>;
   specialCharges: Record<SnowballType, number>;
@@ -111,6 +109,4 @@ export interface GameSettings {
   invertY: boolean;
   soundVolume: number;
   soundMuted: boolean;
-  autoSnapAssist: boolean;
-  reticleStyle: 'tactical' | 'minimal' | 'radar';
 }

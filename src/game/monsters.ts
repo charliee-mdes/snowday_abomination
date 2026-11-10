@@ -423,11 +423,16 @@ export function updateMonsterAnimation(monster: Monster, delta: number) {
   }
 }
 
-/** Flash monster white/ice on hit */
+const isEyeMaterial = (m: THREE.Material | THREE.Material[]) =>
+  m === glowingEyeRed || m === glowingEyeCyan || m === glowingEyeAmber;
+
+/** Flash monster white on hit. Each part remembers its own material so it can be restored exactly. */
 export function flashMonsterHit(monster: Monster) {
   monster.hitTimer = 0.12;
   monster.group.traverse(child => {
-    if (child instanceof THREE.Mesh && child.material !== glowingEyeRed && child.material !== glowingEyeCyan && child.material !== glowingEyeAmber) {
+    if (child instanceof THREE.Mesh && !isEyeMaterial(child.material)) {
+      // Don't overwrite the saved material if we're already mid-flash
+      if (child.material !== hitFlashMat) child.userData.baseMaterial = child.material;
       child.material = hitFlashMat;
     }
   });
@@ -435,12 +440,21 @@ export function flashMonsterHit(monster: Monster) {
 
 function restoreMonsterMaterials(monster: Monster) {
   monster.group.traverse(child => {
-    if (child instanceof THREE.Mesh) {
-      if (child.name === 'head' || child.geometry.type === 'ConeGeometry' || child === monster.parts.head) {
-        child.material = deepIceMat;
-      } else if (child.material === hitFlashMat) {
-        child.material = snowWhiteMat;
-      }
+    if (child instanceof THREE.Mesh && child.userData.baseMaterial) {
+      child.material = child.userData.baseMaterial;
     }
   });
+}
+
+/**
+ * Removes a monster from the scene and frees its GPU geometry.
+ * Geometries are created per monster in createMonster; materials are shared module-level pools and are kept.
+ */
+export function disposeMonster(monster: Monster) {
+  monster.group.removeFromParent();
+  const geometries = new Set<THREE.BufferGeometry>();
+  monster.group.traverse(child => {
+    if (child instanceof THREE.Mesh) geometries.add(child.geometry);
+  });
+  geometries.forEach(g => g.dispose());
 }
