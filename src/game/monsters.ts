@@ -408,18 +408,12 @@ export function updateMonsterAnimation(monster: Monster, delta: number) {
     monster.parts.rightLeg.rotation.x = Math.sin(cycle) * 0.5;
   }
 
-  // 3. Head sway and breath
+  // 3. Head sway
   if (monster.parts.head) {
     monster.parts.head.rotation.y = Math.sin(cycle * 0.5) * 0.15;
-    monster.parts.head.position.y += Math.sin(cycle * 2) * 0.003;
   }
 
-  // 4. Subtle body stomp bob
-  if (monster.parts.body) {
-    monster.parts.body.position.y += Math.abs(Math.sin(cycle)) * 0.005;
-  }
-
-  // 5. Hit flash recovery
+  // 4. Hit flash recovery
   if (monster.hitTimer > 0) {
     monster.hitTimer -= delta;
     if (monster.hitTimer <= 0) {

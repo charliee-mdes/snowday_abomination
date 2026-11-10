@@ -577,10 +577,15 @@ export class GameEngine {
       }
 
       if (distToCenter > 1.8) {
-        // Walk toward center
+        // Walk toward center on the flat snow ground plane
+        _v1.y = 0;
         _v1.normalize();
-        _v1.addScaledVector(_v2, 0.4).normalize();
+        _v2.y = 0;
+        _v1.addScaledVector(_v2, 0.4);
+        _v1.y = 0;
+        _v1.normalize();
         m.position.addScaledVector(_v1, m.speed * delta);
+        m.position.y = 0; // Lock monster flush to the ground plane
 
         // Face forward direction of travel
         m.group.rotation.y = Math.atan2(_v1.x, _v1.z);
